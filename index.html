@@ -47,7 +47,7 @@
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     document.title = "Untuk " + C.NAME;
-    $("#hint").textContent = "Ada sesuatu untuk " + C.NAME;
+    $("#hint").textContent = "There is something for " + C.NAME;
     $("#pin").maxLength = String(C.PIN).length;
 
     let pinShown = false;
@@ -55,7 +55,7 @@
       if (pinShown) return;
       pinShown = true;
       $("#pinForm").hidden = false;
-      $("#hint").textContent = "Masukkan PIN untuk membuka";
+      $("#hint").textContent = "Enter pin to open";
       $("#pin").focus();
     });
 
@@ -64,7 +64,7 @@
       if ($("#pin").value.trim() === String(C.PIN)) {
         openEnvelope();
       } else {
-        $("#pinMsg").textContent = "PIN salah. Coba lagi.";
+        $("#pinMsg").textContent = "Salah kocak.";
         const row = $(".pin-row");
         row.classList.remove("shake");
         void row.offsetWidth;
