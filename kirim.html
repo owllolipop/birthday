@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kirim ucapan</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <meta name="robots" content="noindex">
+</head>
+<body>
+  <main class="page">
+    <h1 id="title"></h1>
+    <p class="lead">Tulis ucapan atau doa, dan tambahkan fotomu kalau mau. Semuanya akan jadi kejutan di hari ulang tahunnya.</p>
+
+    <div class="sheet">
+      <form id="form">
+        <div class="field">
+          <label for="name">Namamu</label>
+          <input id="name" type="text" maxlength="60" required autocomplete="name">
+        </div>
+        <div class="field">
+          <label for="message">Ucapan dan doa</label>
+          <textarea id="message" maxlength="1000" required></textarea>
+        </div>
+        <div class="field">
+          <label for="photo">Foto <span class="opt">(boleh dikosongkan)</span></label>
+          <input id="photo" type="file" accept="image/*">
+          <img id="preview" class="preview" alt="Pratinjau foto" hidden>
+        </div>
+        <button class="btn" id="send" type="submit">Kirim ucapan</button>
+        <p class="msg" id="status" role="status"></p>
+      </form>
+
+      <div class="done" id="done" hidden>
+        <h2>Terkirim!</h2>
+        <p>Terima kasih, <span id="doneName"></span>. Ucapanmu sudah masuk.</p>
+        <button class="btn" id="again" type="button">Kirim satu lagi</button>
+      </div>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script>
+    const C = window.APP;
+    const $ = (s) => document.querySelector(s);
+    const demo = C.SUPABASE_URL.startsWith("YOUR");
+
+    $("#title").textContent = "Ucapan untuk " + C.NAME;
+    document.title = "Ucapan untuk " + C.NAME;
+
+    $("#photo").addEventListener("change", () => {
+      const f = $("#photo").files[0];
+      const img = $("#preview");
+      if (!f) { img.hidden = true; return; }
+      img.src = URL.createObjectURL(f);
+      img.hidden = false;
+    });
+
+    async function shrink(file, max = 1280) {
+      const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+      const s = Math.min(1, max / Math.max(bmp.width, bmp.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(bmp.width * s);
+      c.height = Math.round(bmp.height * s);
+      c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+      return new Promise((res) => c.toBlob(res, "image/jpeg", 0.82));
+    }
+
+    $("#form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const name = $("#name").value.trim();
+      const message = $("#message").value.trim();
+      const file = $("#photo").files[0];
+      if (!name || !message) return;
+
+      $("#send").disabled = true;
+      $("#status").textContent = "Mengirim…";
+
+      try {
+        if (demo) {
+          await new Promise((r) => setTimeout(r, 600));
+        } else {
+          const sb = supabase.createClient(C.SUPABASE_URL, C.SUPABASE_ANON_KEY);
+          let photo_url = null;
+          if (file) {
+            const blob = await shrink(file);
+            const path = crypto.randomUUID() + ".jpg";
+            const up = await sb.storage.from(C.BUCKET).upload(path, blob, { contentType: "image/jpeg" });
+            if (up.error) throw up.error;
+            photo_url = sb.storage.from(C.BUCKET).getPublicUrl(path).data.publicUrl;
+          }
+          const ins = await sb.from("wishes").insert({ name, message, photo_url });
+          if (ins.error) throw ins.error;
+        }
+        $("#doneName").textContent = name;
+        $("#form").hidden = true;
+        $("#done").hidden = false;
+      } catch (err) {
+        console.error(err);
+        $("#status").textContent = "Gagal terkirim. Coba lagi, atau kabari yang mengurus website ini.";
+        $("#send").disabled = false;
+      }
+    });
+
+    $("#again").addEventListener("click", () => {
+      $("#form").reset();
+      $("#preview").hidden = true;
+      $("#status").textContent = "";
+      $("#send").disabled = false;
+      $("#form").hidden = false;
+      $("#done").hidden = true;
+    });
+  </script>
+</body>
+</html>
