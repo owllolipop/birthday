@@ -42,6 +42,12 @@
     </div>
   </main>
 
+  <button id="muteBtn" type="button" hidden
+    style="position:fixed;bottom:18px;right:18px;z-index:50;width:48px;height:48px;border-radius:50%;border:0;background:var(--pink,#b8a598);color:var(--ink,#2a221e);font-size:20px;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,.3);">
+    🔊
+  </button>
+  <audio id="bgm" src="lagu.mp3" loop preload="auto"></audio>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
   <script>
@@ -51,69 +57,3 @@
 
     $("#title").textContent = "Ucapan untuk " + C.NAME;
     document.title = "Ucapan untuk " + C.NAME;
-
-    $("#photo").addEventListener("change", () => {
-      const f = $("#photo").files[0];
-      const img = $("#preview");
-      if (!f) { img.hidden = true; return; }
-      img.src = URL.createObjectURL(f);
-      img.hidden = false;
-    });
-
-    async function shrink(file, max = 1280) {
-      const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
-      const s = Math.min(1, max / Math.max(bmp.width, bmp.height));
-      const c = document.createElement("canvas");
-      c.width = Math.round(bmp.width * s);
-      c.height = Math.round(bmp.height * s);
-      c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
-      return new Promise((res) => c.toBlob(res, "image/jpeg", 0.82));
-    }
-
-    $("#form").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const name = $("#name").value.trim();
-      const message = $("#message").value.trim();
-      const file = $("#photo").files[0];
-      if (!name || !message) return;
-
-      $("#send").disabled = true;
-      $("#status").textContent = "Mengirim…";
-
-      try {
-        if (demo) {
-          await new Promise((r) => setTimeout(r, 600));
-        } else {
-          const sb = supabase.createClient(C.SUPABASE_URL, C.SUPABASE_ANON_KEY);
-          let photo_url = null;
-          if (file) {
-            const blob = await shrink(file);
-            const path = crypto.randomUUID() + ".jpg";
-            const up = await sb.storage.from(C.BUCKET).upload(path, blob, { contentType: "image/jpeg" });
-            if (up.error) throw up.error;
-            photo_url = sb.storage.from(C.BUCKET).getPublicUrl(path).data.publicUrl;
-          }
-          const ins = await sb.from("wishes").insert({ name, message, photo_url });
-          if (ins.error) throw ins.error;
-        }
-        $("#doneName").textContent = name;
-        $("#form").hidden = true;
-        $("#done").hidden = false;
-      } catch (err) {
-        console.error(err);
-        $("#status").textContent = "Gagal terkirim. Coba lagi, atau kabari yang mengurus website ini.";
-        $("#send").disabled = false;
-      }
-    });
-
-    $("#again").addEventListener("click", () => {
-      $("#form").reset();
-      $("#preview").hidden = true;
-      $("#status").textContent = "";
-      $("#send").disabled = false;
-      $("#form").hidden = false;
-      $("#done").hidden = true;
-    });
-  </script>
-</body>
-</html>
