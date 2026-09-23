@@ -3,46 +3,44 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Untukmu</title>
+  <title>Kirim ucapan</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <meta name="robots" content="noindex">
 </head>
 <body>
-
-  <main class="gate" id="gate">
-    <p class="hint" id="hint"></p>
-
-    <button class="envelope" id="env" type="button" aria-label="Buka amplop">
-      <span class="env-back"></span>
-      <span class="env-letter"></span>
-      <span class="env-front"></span>
-      <span class="env-flap"></span>
-      <span class="env-seal" aria-hidden="true">♥</span>
-    </button>
-
-    <form class="pin-form" id="pinForm" hidden autocomplete="off">
-      <div class="pin-row">
-        <input class="pin-input" id="pin" type="password" inputmode="numeric" pattern="[0-9]*"
-               aria-label="PIN" autocomplete="off">
-        <button class="btn" type="submit">Buka</button>
-      </div>
-      <p class="msg" id="pinMsg" role="alert"></p>
-    </form>
-  </main>
-
-  <main class="wall" id="wall" hidden>
+  <main class="page">
     <h1 id="title"></h1>
-    <p class="sub" id="sub"></p>
-    <section class="notes" id="notes"></section>
-  </main>
+    <p class="lead">Thanks for dropping by and leaving a message for yolski guys, write down any wishes, prayers, or whatever you'd like to say below. Thank youuuuououou</p>
 
-  <button id="muteBtn" type="button" hidden
-    style="position:fixed;bottom:18px;right:18px;z-index:50;width:48px;height:48px;border-radius:50%;border:0;background:var(--pink,#b8a598);color:var(--ink,#2a221e);font-size:20px;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,.3);">
-    🔊
-  </button>
-  <audio id="bgm" src="lagu.mp3" loop preload="auto"></audio>
+    <div class="sheet">
+      <form id="form">
+        <div class="field">
+          <label for="name">Namamu</label>
+          <input id="name" type="text" maxlength="60" required autocomplete="name">
+        </div>
+        <div class="field">
+          <label for="message">Ucapan dan doa</label>
+          <textarea id="message" maxlength="1000" required></textarea>
+        </div>
+        <div class="field">
+          <label for="photo">Foto <span class="opt">(boleh dikosongin ye)</span></label>
+          <input id="photo" type="file" accept="image/*">
+          <img id="preview" class="preview" alt="Pratinjau foto" hidden>
+        </div>
+        <button class="btn" id="send" type="submit">Kirim ucapan</button>
+        <p class="msg" id="status" role="status"></p>
+      </form>
+
+      <div class="done" id="done" hidden>
+        <h2>Terkirim!</h2>
+        <p>Terima kasih, <span id="doneName"></span>. Ucapanmu sudah masuk.</p>
+        <button class="btn" id="again" type="button">Kirim satu lagi</button>
+      </div>
+    </div>
+  </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
@@ -50,294 +48,72 @@
     const C = window.APP;
     const $ = (s) => document.querySelector(s);
     const demo = C.SUPABASE_URL.startsWith("YOUR");
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    document.title = "Untuk " + C.NAME;
-    $("#hint").textContent = "Ada sesuatu untuk " + C.NAME;
-    $("#pin").maxLength = String(C.PIN).length;
+    $("#title").textContent = "Ucapan untuk " + C.NAME;
+    document.title = "Ucapan untuk " + C.NAME;
 
-    let pinShown = false;
-    $("#env").addEventListener("click", () => {
-      if (pinShown) return;
-      pinShown = true;
-      $("#pinForm").hidden = false;
-      $("#hint").textContent = "Masukkan PIN untuk membuka";
-      $("#pin").focus();
+    $("#photo").addEventListener("change", () => {
+      const f = $("#photo").files[0];
+      const img = $("#preview");
+      if (!f) { img.hidden = true; return; }
+      img.src = URL.createObjectURL(f);
+      img.hidden = false;
     });
 
-    $("#pinForm").addEventListener("submit", (e) => {
+    async function shrink(file, max = 1280) {
+      const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+      const s = Math.min(1, max / Math.max(bmp.width, bmp.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(bmp.width * s);
+      c.height = Math.round(bmp.height * s);
+      c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+      return new Promise((res) => c.toBlob(res, "image/jpeg", 0.82));
+    }
+
+    $("#form").addEventListener("submit", async (e) => {
       e.preventDefault();
-      if ($("#pin").value.trim() === String(C.PIN)) {
-        openEnvelope();
-      } else {
-        $("#pinMsg").textContent = "PIN salah. Coba lagi.";
-        const row = $(".pin-row");
-        row.classList.remove("shake");
-        void row.offsetWidth;
-        row.classList.add("shake");
-        $("#pin").select();
-      }
-    });
+      const name = $("#name").value.trim();
+      const message = $("#message").value.trim();
+      const file = $("#photo").files[0];
+      if (!name || !message) return;
 
-    function openEnvelope() {
-      $("#pinForm").hidden = true;
-      $("#hint").textContent = "";
-      $("#env").classList.add("open");
+      $("#send").disabled = true;
+      $("#status").textContent = "Mengirim…";
 
-      const bgm = $("#bgm");
-      bgm.play().catch(() => {});
-      const muteBtn = $("#muteBtn");
-      muteBtn.hidden = false;
-      muteBtn.addEventListener("click", () => {
-        bgm.muted = !bgm.muted;
-        muteBtn.textContent = bgm.muted ? "🔇" : "🔊";
-      });
-
-      setTimeout(() => {
-        $("#gate").hidden = true;
-        $("#wall").hidden = false;
-        window.scrollTo(0, 0);
-        loadWishes();
-      }, reduceMotion ? 0 : 1300);
-    }
-
-    const DEMO = [
-      { name: "Sari", message: "Selamat ulang tahun! Semoga selalu sehat, bahagia, dan dikelilingi orang-orang baik.", photo_url: null },
-      { name: "Dimas", message: "Makasih sudah jadi teman yang selalu ada. Semoga tahun ini penuh kabar baik!", photo_url: null },
-      { name: "Mama", message: "Semoga Allah selalu melindungi dan melapangkan rezekimu, nak.\nMama sayang kamu.", photo_url: null }
-    ];
-
-    async function loadWishes() {
-      let rows = DEMO;
-      if (!demo) {
-        try {
+      try {
+        if (demo) {
+          await new Promise((r) => setTimeout(r, 600));
+        } else {
           const sb = supabase.createClient(C.SUPABASE_URL, C.SUPABASE_ANON_KEY);
-          const { data, error } = await sb.from("wishes").select("*").order("created_at", { ascending: true });
-          if (error) throw error;
-          rows = data;
-        } catch (err) {
-          console.error(err);
-          $("#notes").innerHTML = "";
-          const p = document.createElement("p");
-          p.className = "empty";
-          p.textContent = "Ucapannya belum bisa dimuat. Coba muat ulang halaman ini.";
-          $("#notes").appendChild(p);
-          return;
+          let photo_url = null;
+          if (file) {
+            const blob = await shrink(file);
+            const path = crypto.randomUUID() + ".jpg";
+            const up = await sb.storage.from(C.BUCKET).upload(path, blob, { contentType: "image/jpeg" });
+            if (up.error) throw up.error;
+            photo_url = sb.storage.from(C.BUCKET).getPublicUrl(path).data.publicUrl;
+          }
+          const ins = await sb.from("wishes").insert({ name, message, photo_url });
+          if (ins.error) throw ins.error;
         }
-      }
-      render(rows);
-    }
-
-    function render(rows) {
-      $("#title").textContent = "Selamat ulang tahun, " + C.NAME;
-      $("#sub").textContent = rows.length
-        ? rows.length + " ucapan dan doa dari orang-orang yang sayang kamu"
-        : "";
-      const box = $("#notes");
-      box.innerHTML = "";
-      if (!rows.length) {
-        const p = document.createElement("p");
-        p.className = "empty";
-        p.textContent = "Belum ada ucapan.";
-        box.appendChild(p);
-        return;
-      }
-      for (const r of rows) {
-        const card = document.createElement("article");
-        card.className = "note";
-        if (r.photo_url) {
-          const img = document.createElement("img");
-          img.src = r.photo_url;
-          img.alt = "Foto dari " + r.name;
-          img.loading = "lazy";
-          card.appendChild(img);
-        }
-        const p = document.createElement("p");
-        p.textContent = r.message;
-        card.appendChild(p);
-        const f = document.createElement("footer");
-        f.textContent = "dari " + r.name;
-        card.appendChild(f);
-        box.appendChild(card);
-      }
-    }
-  </script>
-</body>
-</html>
-<!DOCTYPE html>
-<html lang="id">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Untukmu</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-
-  <main class="gate" id="gate">
-    <p class="hint" id="hint"></p>
-
-    <button class="envelope" id="env" type="button" aria-label="Buka amplop">
-      <span class="env-back"></span>
-      <span class="env-letter"></span>
-      <span class="env-front"></span>
-      <span class="env-flap"></span>
-      <span class="env-seal" aria-hidden="true">♥</span>
-    </button>
-
-    <form class="pin-form" id="pinForm" hidden autocomplete="off">
-      <div class="pin-row">
-        <input class="pin-input" id="pin" type="password" inputmode="numeric" pattern="[0-9]*"
-               aria-label="PIN" autocomplete="off">
-        <button class="btn" type="submit">Buka</button>
-      </div>
-      <p class="msg" id="pinMsg" role="alert"></p>
-    </form>
-  </main>
-
-  <main class="wall" id="wall" hidden>
-    <h1 id="title"></h1>
-    <p class="sub" id="sub"></p>
-    <section class="notes" id="notes"></section>
-  </main>
-
-  <button id="muteBtn" type="button" hidden
-    style="position:fixed;bottom:18px;right:18px;z-index:50;width:48px;height:48px;border-radius:50%;border:0;background:var(--pink,#b8a598);color:var(--ink,#2a221e);font-size:20px;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,.3);">
-    🔊
-  </button>
-  <audio id="bgm" src="https://happybirthdaybrentwife.vercel.app/lagu.mp3" loop preload="auto"></audio>
-
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js"></script>
-  <script>
-    const C = window.APP;
-    const $ = (s) => document.querySelector(s);
-    const demo = C.SUPABASE_URL.startsWith("YOUR");
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-    document.title = "Untuk " + C.NAME;
-    $("#hint").textContent = "Ada sesuatu untuk " + C.NAME;
-    $("#pin").maxLength = String(C.PIN).length;
-
-    const bgm = $("#bgm");
-
-    function playAudio() {
-      if (bgm.paused) {
-        bgm.play().then(() => {
-          $("#muteBtn").hidden = false;
-        }).catch(() => {});
-      }
-    }
-
-    let pinShown = false;
-    $("#env").addEventListener("click", () => {
-      playAudio();
-      if (pinShown) return;
-      pinShown = true;
-      $("#pinForm").hidden = false;
-      $("#hint").textContent = "Masukkan PIN untuk membuka";
-      $("#pin").focus();
-    });
-
-    $("#pinForm").addEventListener("submit", (e) => {
-      e.preventDefault();
-      playAudio();
-      if ($("#pin").value.trim() === String(C.PIN)) {
-        openEnvelope();
-      } else {
-        $("#pinMsg").textContent = "PIN salah. Coba lagi.";
-        const row = $(".pin-row");
-        row.classList.remove("shake");
-        void row.offsetWidth;
-        row.classList.add("shake");
-        $("#pin").select();
+        $("#doneName").textContent = name;
+        $("#form").hidden = true;
+        $("#done").hidden = false;
+      } catch (err) {
+        console.error(err);
+        $("#status").textContent = "Gagal terkirim. Coba lagi, atau kabari yang mengurus website ini.";
+        $("#send").disabled = false;
       }
     });
 
-    function openEnvelope() {
-      $("#pinForm").hidden = true;
-      $("#hint").textContent = "";
-      $("#env").classList.add("open");
-
-      playAudio();
-      const muteBtn = $("#muteBtn");
-      muteBtn.hidden = false;
-      muteBtn.onclick = () => {
-        bgm.muted = !bgm.muted;
-        muteBtn.textContent = bgm.muted ? "🔇" : "🔊";
-      };
-
-      setTimeout(() => {
-        $("#gate").hidden = true;
-        $("#wall").hidden = false;
-        window.scrollTo(0, 0);
-        loadWishes();
-      }, reduceMotion ? 0 : 1300);
-    }
-
-    const DEMO = [
-      { name: "Sari", message: "Selamat ulang tahun! Semoga selalu sehat, bahagia, dan dikelilingi orang-orang baik.", photo_url: null },
-      { name: "Dimas", message: "Makasih sudah jadi teman yang selalu ada. Semoga tahun ini penuh kabar baik!", photo_url: null },
-      { name: "Mama", message: "Semoga Allah selalu melindungi dan melapangkan rezekimu, nak.\nMama sayang kamu.", photo_url: null }
-    ];
-
-    async function loadWishes() {
-      let rows = DEMO;
-      if (!demo) {
-        try {
-          const sb = supabase.createClient(C.SUPABASE_URL, C.SUPABASE_ANON_KEY);
-          const { data, error } = await sb.from("wishes").select("*").order("created_at", { ascending: true });
-          if (error) throw error;
-          rows = data;
-        } catch (err) {
-          console.error(err);
-          $("#notes").innerHTML = "";
-          const p = document.createElement("p");
-          p.className = "empty";
-          p.textContent = "Ucapannya belum bisa dimuat. Coba muat ulang halaman ini.";
-          $("#notes").appendChild(p);
-          return;
-        }
-      }
-      render(rows);
-    }
-
-    function render(rows) {
-      $("#title").textContent = "Selamat ulang tahun, " + C.NAME;
-      $("#sub").textContent = rows.length
-        ? rows.length + " ucapan dan doa dari orang-orang yang sayang kamu"
-        : "";
-      const box = $("#notes");
-      box.innerHTML = "";
-      if (!rows.length) {
-        const p = document.createElement("p");
-        p.className = "empty";
-        p.textContent = "Belum ada ucapan.";
-        box.appendChild(p);
-        return;
-      }
-      for (const r of rows) {
-        const card = document.createElement("article");
-        card.className = "note";
-        if (r.photo_url) {
-          const img = document.createElement("img");
-          img.src = r.photo_url;
-          img.alt = "Foto dari " + r.name;
-          img.loading = "lazy";
-          card.appendChild(img);
-        }
-        const p = document.createElement("p");
-        p.textContent = r.message;
-        card.appendChild(p);
-        const f = document.createElement("footer");
-        f.textContent = "dari " + r.name;
-        card.appendChild(f);
-        box.appendChild(card);
-      }
-    }
+    $("#again").addEventListener("click", () => {
+      $("#form").reset();
+      $("#preview").hidden = true;
+      $("#status").textContent = "";
+      $("#send").disabled = false;
+      $("#form").hidden = false;
+      $("#done").hidden = true;
+    });
   </script>
 </body>
 </html>
