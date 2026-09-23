@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>For you</title>
+  <title>Untukmu</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
@@ -38,6 +38,12 @@
     <section class="notes" id="notes"></section>
   </main>
 
+  <button id="muteBtn" type="button" hidden
+    style="position:fixed;bottom:18px;right:18px;z-index:50;width:48px;height:48px;border-radius:50%;border:0;background:var(--pink,#b8a598);color:var(--ink,#2a221e);font-size:20px;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,.3);">
+    🔊
+  </button>
+  <audio id="bgm" src="lagu.mp3" loop preload="auto"></audio>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
   <script>
@@ -47,7 +53,7 @@
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     document.title = "Untuk " + C.NAME;
-    $("#hint").textContent = "There is something for " + C.NAME;
+    $("#hint").textContent = "Ada sesuatu untuk " + C.NAME;
     $("#pin").maxLength = String(C.PIN).length;
 
     let pinShown = false;
@@ -55,7 +61,7 @@
       if (pinShown) return;
       pinShown = true;
       $("#pinForm").hidden = false;
-      $("#hint").textContent = "Enter pin to open";
+      $("#hint").textContent = "Masukkan PIN untuk membuka";
       $("#pin").focus();
     });
 
@@ -64,7 +70,7 @@
       if ($("#pin").value.trim() === String(C.PIN)) {
         openEnvelope();
       } else {
-        $("#pinMsg").textContent = "Salah kocak.";
+        $("#pinMsg").textContent = "PIN salah. Coba lagi.";
         const row = $(".pin-row");
         row.classList.remove("shake");
         void row.offsetWidth;
@@ -77,6 +83,16 @@
       $("#pinForm").hidden = true;
       $("#hint").textContent = "";
       $("#env").classList.add("open");
+
+      const bgm = $("#bgm");
+      bgm.play().catch(() => {});
+      const muteBtn = $("#muteBtn");
+      muteBtn.hidden = false;
+      muteBtn.addEventListener("click", () => {
+        bgm.muted = !bgm.muted;
+        muteBtn.textContent = bgm.muted ? "🔇" : "🔊";
+      });
+
       setTimeout(() => {
         $("#gate").hidden = true;
         $("#wall").hidden = false;
@@ -113,9 +129,9 @@
     }
 
     function render(rows) {
-      $("#title").textContent = "Happy birthday yolalalalalallalalalala, ";
+      $("#title").textContent = "Selamat ulang tahun, " + C.NAME;
       $("#sub").textContent = rows.length
-        ? rows.length + " Wishes here! Happiest Birthday to Yolanda Lisna Gavrila. Enjoy your sixteen, Yol."
+        ? rows.length + " ucapan dan doa dari orang-orang yang sayang kamu"
         : "";
       const box = $("#notes");
       box.innerHTML = "";
